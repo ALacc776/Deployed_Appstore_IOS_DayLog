@@ -150,6 +150,8 @@ enum AppConstants {
         static let journalEntries = "journal_entries"
         static let journalStreak = "journal_streak"
         static let copyNewestFirst = "copy_newest_first"
+        static let iCloudBackupEnabled = "icloud_backup_enabled"
+        static let iCloudLastBackupDate = "icloud_last_backup_date"
     }
     
     // MARK: - Date Formatting

@@ -84,6 +84,13 @@ class PhotoManager {
         }
     }
     
+    /// Returns the on-disk location of a photo (used for backup and restore)
+    /// - Parameter filename: The photo filename
+    /// - Returns: File URL inside the photos directory
+    func photoURL(filename: String) -> URL {
+        photosDirectory.appendingPathComponent(filename)
+    }
+
     /// Loads a photo from filename
     /// - Parameter filename: The filename to load
     /// - Returns: UIImage if found, nil otherwise

@@ -21,7 +21,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>1.1</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>2</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
@@ -32,6 +32,18 @@
 	<string>DayLog needs permission to save the photos you take to your library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>DayLog needs access to your photos so you can add them to your daily entries.</string>
+	<key>NSUbiquitousContainers</key>
+	<dict>
+		<key>iCloud.com.daylogapp.ios</key>
+		<dict>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+			<key>NSUbiquitousContainerName</key>
+			<string>DayLog</string>
+			<key>NSUbiquitousContainerSupportedFolderLevels</key>
+			<string>Any</string>
+		</dict>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

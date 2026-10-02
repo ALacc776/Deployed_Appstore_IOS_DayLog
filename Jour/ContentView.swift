@@ -17,7 +17,10 @@ struct ContentView: View {
     
     /// Controls which tab is selected
     @State private var selectedTab = 0
-    
+
+    /// Tracks foreground/background so pending iCloud backups finish before the app suspends
+    @Environment(\.scenePhase) private var scenePhase
+
     // MARK: - Body
     
     var body: some View {
@@ -35,6 +38,11 @@ struct ContentView: View {
                     Label("Calendar", systemImage: "calendar")
                 }
                 .tag(1)
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .background {
+                ICloudBackupManager.shared.flushPendingBackup()
+            }
         }
     }
 }

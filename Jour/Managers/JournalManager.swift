@@ -92,6 +92,22 @@ class JournalManager: ObservableObject {
         successFeedback.notificationOccurred(.success)
     }
     
+    /// Adds entries from a backup, skipping any that already exist (matched by ID)
+    /// - Parameter newEntries: Entries to import
+    /// - Returns: Number of entries actually added
+    @discardableResult
+    func importEntries(_ newEntries: [JournalEntry]) -> Int {
+        let existingIDs = Set(entries.map(\.id))
+        let additions = newEntries.filter { !existingIDs.contains($0.id) }
+        guard !additions.isEmpty else { return 0 }
+
+        entries.append(contentsOf: additions)
+        entries.sort { $0.date > $1.date }
+        saveEntries()
+        updateStreak()
+        return additions.count
+    }
+
     /// Updates an existing journal entry
     /// - Parameters:
     ///   - entry: The entry to update (matched by ID)
@@ -310,7 +326,10 @@ class JournalManager: ObservableObject {
     func saveEntries() {
         // Create a snapshot of entries to save
         let entriesSnapshot = entries
-        
+
+        // Mirror the change to iCloud Drive (debounced, no-op when backup is off)
+        ICloudBackupManager.shared.scheduleBackup(for: self)
+
         persistenceQueue.async { [weak self] in
             guard let self = self else { return }
             do {

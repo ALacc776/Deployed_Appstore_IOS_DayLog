@@ -28,29 +28,52 @@ struct DataExportView: View {
     @State private var alertTitle = ""
     
     /// Selected export format
-    @State private var selectedExportFormat: ExportFormat = .json
-    
+    @State private var selectedExportFormat: ExportFormat = .pdf
+
+    /// Automatic iCloud Drive backup
+    @ObservedObject private var backupManager = ICloudBackupManager.shared
+
+    /// True while restoring from iCloud
+    @State private var isRestoring = false
+
     // MARK: - Export Formats
-    
+
     /// Available export formats
     enum ExportFormat: String, CaseIterable {
+        case pdf = "PDF"
+        case word = "Word"
         case json = "JSON"
         case text = "Text"
         case csv = "CSV"
-        
+
         var fileExtension: String {
             switch self {
+            case .pdf: return "pdf"
+            case .word: return "rtf"
             case .json: return "json"
             case .text: return "txt"
             case .csv: return "csv"
             }
         }
-        
+
         var utType: UTType {
             switch self {
+            case .pdf: return .pdf
+            case .word: return .rtf
             case .json: return .json
             case .text: return .plainText
             case .csv: return .commaSeparatedText
+            }
+        }
+
+        /// Short explanation shown under the format picker
+        var summary: String {
+            switch self {
+            case .pdf: return "A readable copy with photos. Opens anywhere."
+            case .word: return "An editable document for Word, Pages, or Google Docs."
+            case .json: return "A full backup you can import back into DayLog."
+            case .text: return "Plain text, no formatting."
+            case .csv: return "A spreadsheet for Excel or Numbers."
             }
         }
     }
@@ -62,7 +85,11 @@ struct DataExportView: View {
     
     var body: some View {
         NavigationStack {
+            ScrollView {
             VStack(spacing: AppConstants.Spacing.xl) {
+                // MARK: - iCloud Backup Section
+                iCloudBackupSection
+
                 // MARK: - Export Section
                 VStack(alignment: .leading, spacing: AppConstants.Spacing.lg) {
                     Text("Export Data")
@@ -87,6 +114,10 @@ struct DataExportView: View {
                             }
                         }
                         .pickerStyle(SegmentedPickerStyle())
+
+                        Text(selectedExportFormat.summary)
+                            .font(.footnote)
+                            .foregroundColor(AppConstants.Colors.secondaryText)
                     }
                     
                     // Export Button
@@ -218,11 +249,10 @@ struct DataExportView: View {
                     x: AppConstants.Shadows.card.x,
                     y: AppConstants.Shadows.card.y
                 )
-                
-                Spacer()
             }
             .padding(AppConstants.Spacing.xl)
-            .navigationTitle("Data Export")
+            }
+            .navigationTitle("Backup & Export")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -238,6 +268,11 @@ struct DataExportView: View {
         }
         .onChange(of: selectedExportFormat) { _ in
             generateExportFile()
+        }
+        .onChange(of: backupManager.isEnabled) { enabled in
+            if enabled {
+                backUpNow()
+            }
         }
         .sheet(isPresented: $showingDocumentPicker) {
             DocumentPicker(
@@ -265,26 +300,176 @@ struct DataExportView: View {
     
     /// Generates the export file based on current selection
     private func generateExportFile() {
+        let format = selectedExportFormat
         let exportable = ExportableJournal(
             entries: journalManager.entries,
             streak: journalManager.streak,
-            format: selectedExportFormat
+            format: format
         )
-        
-        do {
-            let data: Data
-            switch selectedExportFormat {
-            case .json: data = try exportable.generateJSON()
-            case .text: data = try exportable.generateText()
-            case .csv: data = try exportable.generateCSV()
+
+        // Show "Preparing..." while the file renders; PDFs with photos can take a moment
+        exportURL = nil
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let data: Data
+                switch format {
+                case .pdf: data = exportable.generatePDF()
+                case .word: data = try exportable.generateRTF()
+                case .json: data = try exportable.generateJSON()
+                case .text: data = try exportable.generateText()
+                case .csv: data = try exportable.generateCSV()
+                }
+
+                let url = try exportable.saveToTemp(data: data, ext: format.fileExtension)
+                DispatchQueue.main.async {
+                    // Ignore results for a format the user has already switched away from
+                    if selectedExportFormat == format {
+                        exportURL = url
+                    }
+                }
+            } catch {
+                print("Failed to generate export file: \(error)")
             }
-            
-            // Clean up old temp file if exists?
-            // Actually, just generate a new one.
-            exportURL = try exportable.saveToTemp(data: data, ext: selectedExportFormat.fileExtension)
-        } catch {
-            print("Failed to generate export file: \(error)")
-            // Fallback or alert? For now silent failure means button stays loading or disabled.
+        }
+    }
+
+    // MARK: - iCloud Backup
+
+    /// Toggle, status, and restore controls for the automatic iCloud Drive backup
+    private var iCloudBackupSection: some View {
+        VStack(alignment: .leading, spacing: AppConstants.Spacing.lg) {
+            HStack(spacing: AppConstants.Spacing.sm) {
+                Image(systemName: "icloud.fill")
+                    .foregroundColor(AppConstants.Colors.accentButton)
+                Text("iCloud Backup")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(AppConstants.Colors.primaryText)
+            }
+
+            Text("Keeps a PDF of your journal and a restorable backup in iCloud Drive. Open the DayLog folder in the Files app anytime.")
+                .font(.body)
+                .foregroundColor(AppConstants.Colors.secondaryText)
+
+            Toggle(isOn: $backupManager.isEnabled) {
+                Text("Back Up to iCloud Drive")
+                    .font(.headline)
+                    .foregroundColor(AppConstants.Colors.primaryText)
+            }
+            .tint(AppConstants.Colors.accentButton)
+
+            if backupManager.isEnabled {
+                backupStatusRow
+
+                Button(action: backUpNow) {
+                    HStack {
+                        Image(systemName: "arrow.clockwise.icloud")
+                            .font(.headline)
+                        Text("Back Up Now")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, AppConstants.Spacing.lg)
+                    .primaryButtonStyle()
+                }
+                .disabled(backupManager.status == .backingUp || journalManager.entries.isEmpty)
+            }
+
+            Button(action: restoreFromICloud) {
+                HStack {
+                    if isRestoring {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Image(systemName: "icloud.and.arrow.down")
+                            .font(.headline)
+                    }
+                    Text("Restore from iCloud")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, AppConstants.Spacing.lg)
+                .secondaryButtonStyle()
+            }
+            .disabled(isRestoring)
+        }
+        .padding(AppConstants.Spacing.xl)
+        .background(AppConstants.Colors.secondaryBackground)
+        .cornerRadius(AppConstants.CornerRadius.lg)
+        .shadow(
+            color: AppConstants.Shadows.card.color,
+            radius: AppConstants.Shadows.card.radius,
+            x: AppConstants.Shadows.card.x,
+            y: AppConstants.Shadows.card.y
+        )
+    }
+
+    /// One-line description of the current backup state
+    @ViewBuilder
+    private var backupStatusRow: some View {
+        switch backupManager.status {
+        case .backingUp:
+            HStack(spacing: AppConstants.Spacing.sm) {
+                ProgressView()
+                Text("Backing up…")
+            }
+            .font(.footnote)
+            .foregroundColor(AppConstants.Colors.secondaryText)
+        case .unavailable:
+            Label("Sign in to iCloud and turn on iCloud Drive in Settings to back up.", systemImage: "exclamationmark.icloud")
+                .font(.footnote)
+                .foregroundColor(AppConstants.Colors.errorColor)
+        case .failed(let message):
+            Label("Backup failed: \(message)", systemImage: "exclamationmark.icloud")
+                .font(.footnote)
+                .foregroundColor(AppConstants.Colors.errorColor)
+        case .idle, .off:
+            if let date = backupManager.lastBackupDate {
+                Label("Last backed up \(RelativeDateTimeFormatter().localizedString(for: date, relativeTo: Date()))", systemImage: "checkmark.icloud")
+                    .font(.footnote)
+                    .foregroundColor(AppConstants.Colors.successColor)
+            } else {
+                Text("Not backed up yet")
+                    .font(.footnote)
+                    .foregroundColor(AppConstants.Colors.secondaryText)
+            }
+        }
+    }
+
+    /// Backs up immediately and reports failures
+    private func backUpNow() {
+        backupManager.backUp(entries: journalManager.entries, streak: journalManager.streak) { result in
+            if case .failure(let error) = result {
+                showAlert(title: "Backup Failed", message: error.localizedDescription)
+            }
+        }
+    }
+
+    /// Merges the latest iCloud backup into the journal without removing anything
+    private func restoreFromICloud() {
+        isRestoring = true
+        backupManager.loadLatestBackup { result in
+            isRestoring = false
+            switch result {
+            case .success(let backup):
+                let added = journalManager.importEntries(backup.entries)
+                if backup.streak.longest > journalManager.streak.longest {
+                    journalManager.streak.longest = backup.streak.longest
+                }
+                let message = added == 0
+                    ? "Your journal already has every entry from the iCloud backup."
+                    : "Restored \(added) \(added == 1 ? "entry" : "entries") from iCloud."
+                showAlert(title: "Restore Complete", message: message)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            case .failure(let error):
+                showAlert(title: "Restore Failed", message: error.localizedDescription)
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
         }
     }
     
@@ -292,6 +477,12 @@ struct DataExportView: View {
     
     /// Imports data from a file URL
     private func importData(from url: URL) {
+        // Files picked from iCloud Drive or other providers need scoped access
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if didAccess { url.stopAccessingSecurityScopedResource() }
+        }
+
         do {
             let data = try Data(contentsOf: url)
             
@@ -326,10 +517,11 @@ struct DataExportView: View {
         
         let exportData = try decoder.decode(ExportData.self, from: data)
         
-        // Add imported entries to existing ones
-        for entry in exportData.entries {
-            journalManager.saveEntry(entry)
-        }
+        // Add imported entries, skipping ones already in the journal
+        journalManager.importEntries(exportData.entries)
+
+        // Bring back photos if this file came from the iCloud backup
+        ICloudBackupManager.shared.restorePhotos(for: exportData.entries)
         
         // Update streak if imported data has higher values
         if exportData.streak.longest > journalManager.streak.longest {
@@ -497,6 +689,14 @@ struct ExportableJournal {
         return try encoder.encode(exportData)
     }
     
+    func generatePDF() -> Data {
+        JournalDocumentRenderer.pdfData(entries: entries, streak: streak)
+    }
+
+    func generateRTF() throws -> Data {
+        try JournalDocumentRenderer.rtfData(entries: entries, streak: streak)
+    }
+
     func generateText() throws -> Data {
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .full
@@ -654,9 +854,7 @@ class ShareActivityItemSource: NSObject, UIActivityItemSource {
     
     func activityViewController(_ activityViewController: UIActivityViewController, dataTypeIdentifierForActivityType activityType: UIActivity.ActivityType?) -> String {
         // Explicitly declare type to avoid system guessing
-        if url.pathExtension == "json" { return "public.json" }
-        if url.pathExtension == "csv" { return "public.comma-separated-values-text" }
-        return "public.plain-text"
+        return UTType(filenameExtension: url.pathExtension)?.identifier ?? UTType.plainText.identifier
     }
 }
 

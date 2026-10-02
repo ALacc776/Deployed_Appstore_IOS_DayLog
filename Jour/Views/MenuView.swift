@@ -179,7 +179,7 @@ struct MenuView: View {
                     Button(action: {
                         showingDataExport = true
                     }) {
-                        Label("Export Data", systemImage: "square.and.arrow.up")
+                        Label("Backup & Export", systemImage: "icloud.and.arrow.up")
                             .foregroundColor(AppConstants.Colors.primaryText)
                     }
                 } header: {

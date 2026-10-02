@@ -17,7 +17,7 @@ struct PrivacyPolicyView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppConstants.Spacing.xl) {
                     // Last Updated
-                    Text("Last Updated: December 6, 2025")
+                    Text("Last Updated: October 2, 2026")
                         .font(.caption)
                         .foregroundColor(AppConstants.Colors.secondaryText)
                         .padding(.bottom, AppConstants.Spacing.md)
@@ -36,7 +36,8 @@ struct PrivacyPolicyView: View {
                         
                         • Journal entries are stored locally on your device only
                         • Photos you attach are saved to your device
-                        • No data is sent to external servers
+                        • No data is sent to our servers
+                        • If you turn on iCloud Backup, a copy goes to your own iCloud Drive
                         • No analytics or tracking
                         • No user accounts required
                         • No personal information collected
@@ -49,12 +50,14 @@ struct PrivacyPolicyView: View {
                         content: """
                         All data is stored locally on your device using:
                         
-                        • UserDefaults for journal entries and preferences
+                        • Encrypted storage for journal entries
                         • Local file storage for photos
-                        • Your data never leaves your device
-                        • Backup to iCloud is managed by your iOS settings
                         
-                        If you enable iCloud Backup on your device, your journal data may be included in your iCloud backup. This is controlled by iOS, not by DayLog.
+                        iCloud Backup (optional, off by default): When you turn on "Back Up to iCloud Drive" in Backup & Export, DayLog saves a copy of your journal to the DayLog folder in your own iCloud Drive. This includes a PDF of your journal, a backup file, daily snapshots from the last 60 days, and copies of your photos.
+                        
+                        These backup files are not encrypted by DayLog, so you can open them in the Files app and restore them on a new device. They are protected by your Apple Account and Apple's iCloud security. DayLog's developer cannot access them.
+                        
+                        Separately, your device's own iCloud Backup may include DayLog's data. This is controlled by iOS, not by DayLog.
                         """
                     )
                     
@@ -75,7 +78,7 @@ struct PrivacyPolicyView: View {
                     // Third Party Services
                     policySection(
                         title: "Third-Party Services",
-                        content: "DayLog does not use any third-party services, analytics, or advertising networks. Your data is never shared with third parties."
+                        content: "DayLog does not use any third-party services, analytics, or advertising networks. Your data is never shared with third parties. The only outside service DayLog uses is Apple's iCloud Drive, and only when you turn on iCloud Backup."
                     )
                     
                     // Data Security
@@ -85,8 +88,8 @@ struct PrivacyPolicyView: View {
                         Your journal entries are protected by:
                         
                         • Device-level encryption provided by iOS
-                        • No network transmission of data
-                        • Local storage only
+                        • Encryption of entries stored in the app
+                        • No network transmission, except to your own iCloud Drive if you turn on iCloud Backup
                         
                         Your data is as secure as your device. We recommend:
                         • Using a strong device passcode
@@ -101,7 +104,8 @@ struct PrivacyPolicyView: View {
                         content: """
                         You have complete control over your data:
                         
-                        • Export: Copy your entries at any time using the export feature
+                        • Export: Save your entries as PDF, Word, JSON, Text, or CSV at any time
+                        • Backup: Keep an automatic copy in your iCloud Drive and restore it on any device
                         • Delete: Remove individual entries or all data from Settings
                         • No Account: No registration means no forgotten passwords
                         • Full Ownership: Your entries belong to you
@@ -118,7 +122,9 @@ struct PrivacyPolicyView: View {
                         2. Tap "Delete All Data"
                         3. Confirm the deletion
                         
-                        Or simply delete the app from your device. All data will be removed. There's no server-side data to worry about.
+                        Or simply delete the app from your device. There's no data on our servers to worry about.
+                        
+                        If you turned on iCloud Backup, the copies in iCloud Drive are kept after you delete data in the app or delete the app itself. To remove them, open the Files app, go to iCloud Drive, and delete the DayLog folder.
                         """
                     )
                     
@@ -153,7 +159,7 @@ struct PrivacyPolicyView: View {
                             .fontWeight(.bold)
                             .foregroundColor(AppConstants.Colors.primaryText)
                         
-                        Text("DayLog is a privacy-first journaling app. Everything stays on your device. We don't collect, transmit, or sell your data. Your journal is yours alone.")
+                        Text("DayLog is a privacy-first journaling app. Your journal stays on your device, plus your own iCloud Drive if you choose. We don't collect, receive, or sell your data. Your journal is yours alone.")
                             .font(.body)
                             .foregroundColor(AppConstants.Colors.primaryText)
                             .padding(AppConstants.Spacing.lg)
